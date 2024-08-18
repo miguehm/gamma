@@ -69,13 +69,14 @@ import ExternalScripts from '../components/ExternalScripts.astro';
 <LocalScripts />
 <Layout title="test">
 	<main>
-		<h2>Aplicar Transformación Gamma a una Imagen</h2>
+		<h1 class="text-gradient">Transformación Gamma</h1>
     <input type="file" id="imageInput" accept="image/*">
     <br><br>
     <label for="gammaSlider">Valor de Gamma:</label>
     <input type="range" id="gammaSlider" min="0.1" max="6.0" step="0.1" value="1.0">
     <span id="gammaValue">1.0</span>
     <p id="numeroParrafo"></p>
+    <button id="downloadButton" disabled>Descargar Imagen</button>
     <br><br>
     <img id="inputImage" src="" alt="Imagen original" style="display:none;">
     <canvas id="outputCanvas" class="outputCanvas"></canvas>
@@ -103,7 +104,7 @@ import ExternalScripts from '../components/ExternalScripts.astro';
 		z-index: -1;
 	}
 	h1 {
-		font-size: 4rem;
+		font-size: 3rem;
 		font-weight: 700;
 		line-height: 1;
 		text-align: center;
@@ -113,7 +114,7 @@ import ExternalScripts from '../components/ExternalScripts.astro';
 		background-image: var(--accent-gradient);
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
-		background-size: 400%;
+		background-size: 200%;
 		background-position: 0%;
 	}
 	.instructions {
@@ -140,10 +141,10 @@ import ExternalScripts from '../components/ExternalScripts.astro';
 		gap: 2rem;
 		padding: 0;
 	}
-	<!-- #outputCanvas { -->
-	<!-- 	width: 70%; -->
-	<!-- 	display: block; -->
-	<!-- 	margin: auto; -->
+	#outputCanvas {
+		width: 80%;
+		display: block;
+		margin: auto;
 	}
 	<!-- #ImageInput { -->
 	<!-- 	width: 100%; -->

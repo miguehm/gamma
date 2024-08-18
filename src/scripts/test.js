@@ -1,99 +1,108 @@
-let src, dst, originalMat;
+let originalMat;
 let b, g, r;
 let pixelX, pixelY;
+let isProcessing = false;
 
-document.getElementById('imageInput').addEventListener('change', function(e) {
+// Cargar imagen
+document.getElementById('imageInput').addEventListener('change', (e) => {
     let input = e.target;
     let reader = new FileReader();
-    reader.onload = function() {
+    reader.onload = () => {
         let imgElement = document.getElementById('inputImage');
         imgElement.src = reader.result;
-        imgElement.onload = function() {
-            src = cv.imread(imgElement);
-            originalMat = src.clone();  // Guardar una copia de la imagen original
-            dst = new cv.Mat();
+        imgElement.onload = () => {
+            if (originalMat) originalMat.delete();
+            originalMat = cv.imread(imgElement);
             applyGammaCorrection(parseFloat(document.getElementById('gammaSlider').value));
         }
     };
     reader.readAsDataURL(input.files[0]);
 });
 
-document.getElementById('gammaSlider').addEventListener('input', function() {
-    let gamma = parseFloat(this.value);
-    document.getElementById('gammaValue').textContent = gamma.toFixed(1);
-    if (src) {
-        applyGammaCorrection(gamma);
-        document.getElementById('numeroParrafo').textContent = `Valor de intensidad del pixel (${pixelX}, ${pixelY}): (R: ${r}, G: ${g}, B: ${b})`;
-    }
-});
-
-function applyGammaCorrection(gamma) {
-    src = originalMat.clone();  // Restaurar la imagen original
-
-    if(gamma > 0) {
-        // Convertir la imagen a un rango de [0, 1]
-        src.convertTo(src, cv.CV_32F, 1.0 / 255.0);
-
-        // Aplicar la corrección gamma
-        cv.pow(src, 1.0/gamma, dst);
-
-        // Convertir de nuevo al rango de [0, 255]
-        dst.convertTo(dst, cv.CV_8U, 255.0);
-
-        // Mostrar la imagen resultante en el canvas
-        cv.imshow('outputCanvas', dst);
-
-        // acceder al pixel (100, 100)
-        let pixel = dst.ucharPtr(100, 100);
-        b = pixel[0];
-        g = pixel[1];
-        r = pixel[2];
-        // console.log(`Valor de intensidad del pixel (100, 100): (R: ${r}, G: ${g}, B: ${b})`);
-
-        
-        // Limpiar la imagen temporal
-        src.delete();
-        
-    }
+// Función de debounce para limitar la frecuencia de llamadas
+const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
-// function getRGB() {
-//     return [r, g, b];
-// }
+// Slider
+document.getElementById('gammaSlider').addEventListener('input', debounce(() => {
+    let gamma = parseFloat(document.getElementById('gammaSlider').value);
+    document.getElementById('gammaValue').textContent = gamma.toFixed(1);
+    if (originalMat) {
+        applyGammaCorrection(gamma);
+    }
+}, 50));
 
+const applyGammaCorrection = (gamma) => {
+    if (isProcessing) return;
+    isProcessing = true;
 
-const canvas = document.getElementById('outputCanvas');
-const ctx = canvas.getContext('2d');
+    let src = originalMat.clone();
+    let dst = new cv.Mat();
 
-canvas.addEventListener('click', function(event) {
-    // Obtener la posición del canvas en la página
-    // const rect = canvas.getBoundingClientRect();
-    //
-    // // Calcular las coordenadas del clic relativas al canvas
-    // const x = event.clientX - rect.left;
-    // const y = event.clientY - rect.top;
-    //
-    // // Redondear a enteros si es necesario
-    // const pixelX = Math.round(x);
-    // const pixelY = Math.round(y);
+    if (gamma > 0) {
+        if (src.type() !== cv.CV_8U) {
+            src.convertTo(src, cv.CV_8U);
+        }
+
+        let lut = gamma_lut(gamma);
+        cv.LUT(src, lut, dst);
+
+        cv.imshow('outputCanvas', dst);
+
+        lut.delete();
+        
+        // Habilitar el botón de descarga
+        document.getElementById('downloadButton').disabled = false;
+    }
+
+    src.delete();
+    dst.delete();
+
+    isProcessing = false;
+}
+
+const gamma_lut = (gamma) => {
+    let lut = new cv.Mat(1, 256, cv.CV_8U);
+    for (let i = 0; i < 256; i++) {
+        let value = Math.pow(i / 255.0, 1.0 / gamma) * 255.0;
+        lut.ucharPtr(0, i)[0] = Math.round(value);
+    }
+    return lut;
+}
+
+// Función para descargar la imagen
+const downloadImage = () => {
+    // Obtener el canvas
+    const canvas = document.getElementById('outputCanvas');
     
-    pixelX = Math.round(event.offsetX);
-    pixelY = Math.round(event.offsetY);
+    // Convertir el canvas a un blob
+    canvas.toBlob((blob) => {
+        // Crear un objeto URL para el blob
+        const url = URL.createObjectURL(blob);
+        
+        // Crear un elemento de enlace temporal
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = 'imagen_corregida.png';
+        
+        // Simular un clic en el enlace
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        // Liberar el objeto URL
+        URL.revokeObjectURL(url);
+    }, 'image/png');
+}
 
-    console.log(`Clic en el pixel: (${pixelX}, ${pixelY})`);
-    
-    document.getElementById('numeroParrafo').textContent = `Valor de intensidad del pixel (${pixelX}, ${pixelY}): (R: ${r}, G: ${g}, B: ${b})`;
-
-    // Aquí puedes hacer lo que quieras con las coordenadas
-    // Por ejemplo, dibujar un punto en esa posición:
-    ctx.beginPath();
-    ctx.arc(pixelX, pixelY, 3, 0, 2 * Math.PI);
-    ctx.fill();
-});
-
-// Limpiar recursos cuando la página se recarga o cierra
-window.addEventListener('beforeunload', function() {
-    if (src) src.delete();
-    if (dst) dst.delete();
-    if (originalMat) originalMat.delete();
-});
+// Agregar el evento al botón de descarga
+document.getElementById('downloadButton').addEventListener('click', downloadImage);
